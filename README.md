@@ -1,2 +1,2 @@
 # perf_kernels
-some small kernels to test dependencies on network traffic
+some small kernels to test dependence of performance on network traffic
