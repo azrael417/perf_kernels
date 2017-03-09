@@ -183,6 +183,8 @@ int main(int argc, char* argv[]){
   MPI_Type_contiguous(lgrid[1]*lgrid[2],MPI_DOUBLE,&slices[0]);
   MPI_Type_contiguous(lgrid[0]*lgrid[2],MPI_DOUBLE,&slices[1]);
   MPI_Type_contiguous(lgrid[0]*lgrid[1],MPI_DOUBLE,&slices[2]);
+  //commit slice-types
+  for(unsigned int dir=0; dir<3; dir++) MPI_Type_commit( &slices[dir] );
 
   /*//in x, slice of size y*z is communicated:
   MPI_Datatype yslice;
@@ -195,8 +197,6 @@ int main(int argc, char* argv[]){
   MPI_Type_vector(lgrid[2],lgrid[0],(lgrid[0]+2)*(lgrid[1]+2),MPI_DOUBLE,&slices[1]);
   //in z, slice of size x*y is communicated
   MPI_Type_vector(lgrid[1],lgrid[0],2,MPI_DOUBLE,&slices[2]);
-  //commit slice-types
-  for(unsigned int dir=0; dir<3; dir++) MPI_Type_commit( &slices[dir] );
 
   //check extents:
   for(unsigned int dir=0; dir<3; dir++){
@@ -233,15 +233,15 @@ int main(int argc, char* argv[]){
   rbuf[1]=new double[lgrid[1]*lgrid[2]];
   rbuf[2]=new double[lgrid[0]*lgrid[2]];
   rbuf[3]=new double[lgrid[0]*lgrid[2]];
-  rbuf[4]=new double[lgrid[1]*lgrid[2]];
-  rbuf[5]=new double[lgrid[1]*lgrid[2]];
+  rbuf[4]=new double[lgrid[0]*lgrid[1]];
+  rbuf[5]=new double[lgrid[0]*lgrid[1]];
   double** sbuf=new double*[6];
   sbuf[0]=new double[lgrid[1]*lgrid[2]];
   sbuf[1]=new double[lgrid[1]*lgrid[2]];
   sbuf[2]=new double[lgrid[0]*lgrid[2]];
   sbuf[3]=new double[lgrid[0]*lgrid[2]];
-  sbuf[4]=new double[lgrid[1]*lgrid[2]];
-  sbuf[5]=new double[lgrid[1]*lgrid[2]];
+  sbuf[4]=new double[lgrid[0]*lgrid[1]];
+  sbuf[5]=new double[lgrid[0]*lgrid[1]];
 
   /*//y*z slice
   rbuf[0]=umat[0][1][1];
@@ -278,7 +278,6 @@ int main(int argc, char* argv[]){
 
       //define some vars
       MPI_Request req;
-      std::cout << " myrank: " << myrank << " dir: " << dir << std::endl;
 
       //receives
       //issue receive from -dir:
@@ -308,6 +307,7 @@ int main(int argc, char* argv[]){
       queue.pop();
       int flag=0;
       MPI_Test(&req, &flag, MPI_STATUS_IGNORE);
+      //MPI_Wait(&req, MPI_STATUS_IGNORE);
       if(!flag){
         queue.push(req);
       }
@@ -323,6 +323,10 @@ int main(int argc, char* argv[]){
   //clean up:
   delete [] u;
   delete [] nnranks;
+  for(unsigned int dir=0; dir<6; dir++){
+    delete [] rbuf[dir];
+    delete [] sbuf[dir];
+  }
   delete [] rbuf;
   delete [] sbuf;
   /*for(unsigned int x=0; x<lgrid[0]+2; x++){
