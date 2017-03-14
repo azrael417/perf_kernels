@@ -79,7 +79,16 @@ void pprintI(char* str, int i, MPI_Comm comm) {
 int main(int argc, char** argv) {
   int i;
   int rank, nprocs;
-  MPI_Init(&argc, &argv);
+
+  //init MPI
+  int required=MPI_THREAD_FUNNELED, provided;
+  MPI_Init_thread(&argc,&argv,required,&provided);
+  if(required!=provided){
+    std::cerr << "Error, asked for MPI thread level " << required << " but got " << provided << ", abort." << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  //comm stuff
   MPI_Comm comm, comm_s;
   comm = MPI_COMM_WORLD;
   MPI_Comm_rank(comm, &rank);
@@ -93,8 +102,34 @@ int main(int argc, char** argv) {
 
   pprintI("color", color, comm);
 
+  //read parameters
+  //init parser
+  int error=0;
   int n=8, nt=1000;
   double trun = 20.0;
+  if(rank==0){
+    std::cout << "reading input parameters." << std::endl;
+
+    InputParser input(argc, argv);
+
+    //parse box size arguments:
+    if(input.cmdOptionExists("--buffer_size")){
+        // Do stuff
+        n = atoi(input.getCmdOption("--buffer_size").c_str());
+    }
+    if(input.cmdOptionExists("--niter")){
+        // Do stuff
+        nt = atoi(input.getCmdOption("--niter").c_str());
+    }
+    if(input.cmdOptionExists("--sleeptime")){
+        // Do stuff
+        trun = atof(input.getCmdOption("--sleeptime").c_str());
+    }
+  }
+  //broadcast
+  MPI_Bcast(&n,1,MPI_INTEGER,0,MPI_COMM_WORLD);
+  MPI_Bcast(&nt,1,MPI_INTEGER,0,MPI_COMM_WORLD);
+  MPI_Bcast(&trun,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 
   double* t1  = new double[nt];
   double* ts1 = new double[nt];
