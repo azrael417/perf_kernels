@@ -1,5 +1,6 @@
+
 #include "global.hpp"
-#include "input.hpp"
+#include "utils.hpp"
 
 //face packing
 void pack_face(int odir, int* lgrid, double* arr, double* sbuf){
