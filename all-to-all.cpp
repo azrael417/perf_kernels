@@ -56,7 +56,6 @@ long random_at_mostL(long max) {
   return x/bin_size;
 }
 
-
 int mycolor(MPI_Comm comm) {
   return (int) random_at_mostL(1);
 }
@@ -94,18 +93,10 @@ int main(int argc, char** argv) {
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &nprocs);
 
-  //int c = color(comm);
-  srand(rank);
-  int color = (int) random_at_mostL(1);
-
-  MPI_Comm_split(comm, color, rank, &comm_s);
-
-  pprintI("color", color, comm);
-
   //read parameters
   //init parser
   int error=0;
-  int n=8, nt=1000;
+  int n=8, nt=1000, numcols=1;
   double trun = 20.0;
   if(rank==0){
     std::cout << "reading input parameters." << std::endl;
@@ -125,36 +116,41 @@ int main(int argc, char** argv) {
         // Do stuff
         trun = atof(input.getCmdOption("--sleeptime").c_str());
     }
+    if(input.cmdOptionExists("--num_colors")){
+        // Do stuff
+        numcols = atoi(input.getCmdOption("--num_colors").c_str());
+    }
   }
   //broadcast
   MPI_Bcast(&n,1,MPI_INTEGER,0,MPI_COMM_WORLD);
   MPI_Bcast(&nt,1,MPI_INTEGER,0,MPI_COMM_WORLD);
   MPI_Bcast(&trun,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+  MPI_Bcast(&numcols,1,MPI_INTEGER,0,MPI_COMM_WORLD);
+
+  //do coloring;
+  srand(rank);
+  int color = static_cast<int>(random_at_mostL(numcols));
+  MPI_Comm_split(comm, color, rank, &comm_s);
+  pprintI("color", color, comm);
 
   double* t1  = new double[nt];
   double* ts1 = new double[nt];
   double* t2  = new double[nt];
   double* ts2 = new double[nt];
 
-  if ( color == 0 ) {
-    printf("Sleeping 0 - %f\n", MPI_Wtime());
-    sleep( (int) (0.5*trun) );
-    printf("Woke 0 - %f\n", MPI_Wtime());
-    a2a(n, nt, trun, t1, ts1, comm_s);
-  } else {
-    printf("Woke 1 - %f\n", MPI_Wtime());
-    a2a(n, nt, trun, t2, ts2, comm_s);
-  }
+  double delay=1./double(numcols);
+  printf("Sleeping 0 - %f\n", MPI_Wtime());
+  sleep( static_cast<int>(color*delay*trun) );
+  printf("Woke 0 - %f\n", MPI_Wtime());
+  a2a(n, nt, trun, t1, ts1, comm_s);
   MPI_Barrier(comm);
 
-  if (color == 0) {
-    output_timing("0", t1, ts1, nt, comm_s);
-    fflush(stdout);
-  }
-  MPI_Barrier(comm);
-  if (color == 1) {
-    output_timing("1", t2, ts2, nt, comm_s);
-    fflush(stdout);
+  for(unsigned int c=0; c<numcols; c++){
+    if(c==color){
+      output_timing(const_cast<char*>(std::to_string(c).c_str()), t1, ts1, nt, comm_s);
+      fflush(stdout);
+    }
+    MPI_Barrier(comm);
   }
 
   //clean up
