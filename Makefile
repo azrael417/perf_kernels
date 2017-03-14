@@ -1,7 +1,7 @@
 CXX:=CC
 OPTFLAGS:=-qopenmp -O3
 DEBUGFLAGS:=-g -dynamic
-CPPFLAGS:=$(OPTFLAGS) $(DEBUGFLAGS)
+CPPFLAGS:=$(OPTFLAGS) $(DEBUGFLAGS) -mkl
 LDFLAGS:=$(DEBUGFLAGS)
 LIBS:= # $(DDT_LINK_DMALLOC)
 
@@ -10,6 +10,9 @@ LIBS:= # $(DDT_LINK_DMALLOC)
 
 all-to-all.x : utils.o all-to-all.o
 	$(CXX) $(CPPFLAGS) $(LDFLAGS) utils.o all-to-all.o -o all-to-all.x $(LIBS)
+
+minibench.x : utils.o minibench.o
+	$(CXX) $(CPPFLAGS) $(LDFLAGS) utils.o minibench.o -o minibench.x $(LIBS)
 
 nn_exchange.x : utils.o nn_exchange.o
 	$(CXX) $(CPPFLAGS) $(LDFLAGS) utils.o nn_exchange.o -o nn_exchange.x $(LIBS)

@@ -244,26 +244,9 @@ int main(int argc, char* argv[]){
   sbuf[4]=new double[lgrid[0]*lgrid[1]];
   sbuf[5]=new double[lgrid[0]*lgrid[1]];
 
-  /*//y*z slice
-  rbuf[0]=umat[0][1][1];
-  rbuf[1]=umat[lgrid[0]+1][1][1];
-  //x*z slice
-  rbuf[2]=umat[1][0][1];
-  rbuf[3]=umat[1][lgrid[1]+1][1];
-  //x*y slice
-  rbuf[4]=umat[1][1][0];
-  rbuf[5]=umat[1][1][lgrid[2]+1];
-  //now the send buffers
-  double** sbuf=new double*[6];
-  //x-dir
-  sbuf[0]=umat[1][1][1];
-  sbuf[1]=umat[lgrid[0]][1][1];
-  //y-dir
-  sbuf[2]=umat[1][1][1];
-  sbuf[3]=umat[1][lgrid[1]][1];
-  //z-dir
-  sbuf[4]=umat[1][1][1];
-  sbuf[5]=umat[1][1][lgrid[2]];*/
+  //timing tables
+  double* t  = new double[maxiter];
+  double* ts = new double[maxiter];
 
   //start the kernel:
   if(myrank==0){
@@ -274,7 +257,9 @@ int main(int argc, char* argv[]){
     //comm in directions: issue send-receives
     std::queue<MPI_Request> queue;
 
-    //comms in x:
+    //timestamp
+    ts[iter] = MPI_Wtime();
+    //iterate over directions
     for(unsigned int dir=0; dir<3; dir++){
 
       //define some vars
@@ -314,12 +299,16 @@ int main(int argc, char* argv[]){
       }
     }
     //iteration completed
+    t[iter] = MPI_Wtime() - ts[iter];
   }
   MPI_Barrier(comm3d);
 
   if(myrank==0){
     std::cout << "Test done." << std::endl;
   }
+
+  //print timing
+  output_timing("0", t, ts, maxiter, comm3d);
 
   //clean up:
   delete [] u;
@@ -328,15 +317,10 @@ int main(int argc, char* argv[]){
     delete [] rbuf[dir];
     delete [] sbuf[dir];
   }
+  delete [] t;
+  delete [] ts;
   delete [] rbuf;
   delete [] sbuf;
-  /*for(unsigned int x=0; x<lgrid[0]+2; x++){
-    for(unsigned int y=0; y<lgrid[1]+2; y++){
-      delete [] umat[x][y];
-    }
-    delete umat[x];
-  }
-  delete [] umat;*/
   delete [] lgrid;
 
   //free types:
