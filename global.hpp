@@ -12,6 +12,8 @@
 
 //parallelization stuff
 #include <mpi.h>
-//#include <pmi.h>
 #include <omp.h>
+
+//topology stuff
+#include <pmi.h>
 #endif
