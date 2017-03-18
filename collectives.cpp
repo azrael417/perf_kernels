@@ -18,9 +18,7 @@ void a2a(int n, int nt, int tlim, double *t, double *ts, MPI_Comm comm) {
   MPI_Barrier(comm);
   for (i=0; i<nt; i++) {
     ts[i] = MPI_Wtime();
-    int ierr = MPI_Alltoall(sbuf, n, MPI_DOUBLE,
-			    rbuf, n, MPI_DOUBLE,
-			    comm);
+    int ierr = MPI_Alltoall(sbuf, n, MPI_DOUBLE, rbuf, n, MPI_DOUBLE, comm);
     t[i] = MPI_Wtime() - ts[i];
     usleep(udt);
   }
@@ -35,10 +33,10 @@ void ar(int n, int nt, int tlim, double *t, double *ts, MPI_Comm comm) {
   int udt = (int) (1000000 * dt);
 
   MPI_Comm_size(comm, &nprocs);
-  double *sbuf = reinterpret_cast<double*>(aligned_alloc(64, n*nprocs*sizeof(double)));
+  double *sbuf = reinterpret_cast<double*>(aligned_alloc(64, n*sizeof(double)));
   double *rbuf = reinterpret_cast<double*>(aligned_alloc(64, n*sizeof(double)));
 
-  for (i=0; i<n*nprocs; i++) {
+  for (i=0; i<n; i++) {
     sbuf[i] = 1.0;
     rbuf[i] = 0.0;
   }
@@ -46,7 +44,7 @@ void ar(int n, int nt, int tlim, double *t, double *ts, MPI_Comm comm) {
   MPI_Barrier(comm);
   for (i=0; i<nt; i++) {
     ts[i] = MPI_Wtime();
-    int ierr = MPI_Alltoall(sbuf, rbuf, n, MPI_DOUBLE, MPI_SUM, comm);
+    int ierr = MPI_Allreduce(sbuf, rbuf, n, MPI_DOUBLE, MPI_SUM, comm);
     t[i] = MPI_Wtime() - ts[i];
     usleep(udt);
   }
@@ -161,11 +159,24 @@ int main(int argc, char** argv) {
   if(error){
     MPI_Finalize();
   }
-  MPI_Bcast(&mode.c_str(),mode.size(),MPI_CHAR,0,MPI_COMM_WORLD);
+  //broadcast mode
+  int stringsize=mode.size();
+  MPI_Bcast(&stringsize,1,MPI_INTEGER,0,MPI_COMM_WORLD);
+  if(rank!=0){
+    mode.resize(stringsize);
+  }
+  MPI_Bcast(reinterpret_cast<void*>(const_cast<char*>(mode.c_str())),stringsize,MPI_CHAR,0,MPI_COMM_WORLD);
+  //broadcast buffer chunk sizes
   MPI_Bcast(&n,1,MPI_INTEGER,0,MPI_COMM_WORLD);
+  //number of time steps
   MPI_Bcast(&nt,1,MPI_INTEGER,0,MPI_COMM_WORLD);
   MPI_Bcast(&trun,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
   MPI_Bcast(&numcols,1,MPI_INTEGER,0,MPI_COMM_WORLD);
+
+  //print what mode we are using
+  if(rank==0){
+    std::cout << "Running " << mode << std::endl;
+  }
 
   //do coloring;
   srand(rank);
