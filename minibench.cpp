@@ -59,16 +59,27 @@ int main(int argc, char* argv[]){
   tave/=double(niter);
   MPI_Barrier(MPI_COMM_WORLD);
 
+  //gather data from the nodes:
+  double* tminv=new double[numranks];
+  double* tmaxv=new double[numranks];
+  double* tavev=new double[numranks];
+  MPI_Gather(&tmin,1,MPI_DOUBLE,tminv,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+  MPI_Gather(&tmax,1,MPI_DOUBLE,tmaxv,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+  MPI_Gather(&tave,1,MPI_DOUBLE,tavev,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+
   //ordered timings printed
-  for(unsigned int rank=0; rank<numranks; rank++){
-    if(rank==myrank){
-      std::cout << "DGEMM time (size: " << N << "x" << N << ", rank: " << myrank << "): min = " << tmin << ", max = " << tmax << ", mean = " << tave << std::endl;
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
+  if(myrank==0){
+    for(unsigned int rank=0; rank<numranks; rank++){
+        std::cout << "DGEMM time (size: " << N << "x" << N << ", rank: " << rank << "): min = " << tminv[rank]
+                                                                                  << ", max = " << tmaxv[rank]
+                                                                                  << ", mean = " << tavev[rank] << std::endl;
+      }
   }
+  MPI_Barrier(MPI_COMM_WORLD);
 
   //cleaning up
   delete [] m1, m2, m3;
+  delete [] tminv, tmaxv, tavev;
 
   if(myrank==0) std::cout << "--- finishing DGEMM minibench ---" << std::endl;
 
