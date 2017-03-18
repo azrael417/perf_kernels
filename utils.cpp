@@ -33,18 +33,20 @@ void output_timing(char* str, double *t, double *ts, int nt, MPI_Comm comm) {
   int i, rank, nprocs;
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &nprocs);
-  double tmin[nt],tmax[nt],tavg[nt];
-  for (i=0; i<nt; i++) {
-    MPI_Reduce(&t[i], &tmin[i], 1, MPI_DOUBLE, MPI_MIN, 0, comm);
-    MPI_Reduce(&t[i], &tmax[i], 1, MPI_DOUBLE, MPI_MAX, 0, comm);
-    MPI_Reduce(&t[i], &tavg[i], 1, MPI_DOUBLE, MPI_SUM, 0, comm);
-    tavg[i] /= nprocs;
-  }
+  double* tmin=new double[nt];
+  double* tmax=new double[nt];
+  double* tavg=new double[nt];
+  MPI_Reduce(&t[i], &tmin[i], nt, MPI_DOUBLE, MPI_MIN, 0, comm);
+  MPI_Reduce(&t[i], &tmax[i], nt, MPI_DOUBLE, MPI_MAX, 0, comm);
+  MPI_Reduce(&t[i], &tavg[i], nt, MPI_DOUBLE, MPI_SUM, 0, comm);
+  for(unsigned int i=0; i<nt; i++) tavg[i] /= nprocs;
 
   if (rank==0) {
     for (i=0; i<nt; i++) {
       printf("%-15s ts,min,max,avg = %f %f %f %f\n", str, ts[i], tmin[i], tmax[i], tavg[i]);
     }
   }
+  delete [] tmin,tmax,tavg;
+  MPI_Barrier(comm);
   return;
 }

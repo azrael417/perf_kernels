@@ -90,13 +90,19 @@ void pprintI(char* str, int i, MPI_Comm comm) {
   int rank, nprocs;
   MPI_Comm_size(comm, &nprocs);
   MPI_Comm_rank(comm, &rank);
-  for (j=0; j<nprocs; j++) {
-    if (rank == j) {
-      printf("%i: %-20s = %i\n", rank, str, i);
+
+  //gather on node 0:
+  int* iarr= new int[nprocs];
+  MPI_Gather(&i,1,MPI_INTEGER,iarr,1,MPI_INTEGER,0,comm);
+
+  if(rank==0){
+    for (j=0; j<nprocs; j++) {
+      printf("%i: %-20s = %i\n", j, str, iarr[j]);
       fflush(stdout);
     }
-    MPI_Barrier(comm);
   }
+  delete [] iarr;
+  MPI_Barrier(comm);
 }
 
 int main(int argc, char** argv) {
