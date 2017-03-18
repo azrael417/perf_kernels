@@ -29,6 +29,32 @@ void a2a(int n, int nt, int tlim, double *t, double *ts, MPI_Comm comm) {
   return;
 }
 
+void ar(int n, int nt, int tlim, double *t, double *ts, MPI_Comm comm) {
+  int i, nprocs;
+  double dt = tlim / (double) nt;
+  int udt = (int) (1000000 * dt);
+
+  MPI_Comm_size(comm, &nprocs);
+  double *sbuf = reinterpret_cast<double*>(aligned_alloc(64, n*nprocs*sizeof(double)));
+  double *rbuf = reinterpret_cast<double*>(aligned_alloc(64, n*sizeof(double)));
+
+  for (i=0; i<n*nprocs; i++) {
+    sbuf[i] = 1.0;
+    rbuf[i] = 0.0;
+  }
+
+  MPI_Barrier(comm);
+  for (i=0; i<nt; i++) {
+    ts[i] = MPI_Wtime();
+    int ierr = MPI_Alltoall(sbuf, rbuf, n, MPI_DOUBLE, MPI_SUM, comm);
+    t[i] = MPI_Wtime() - ts[i];
+    usleep(udt);
+  }
+  free(sbuf);
+  free(rbuf);
+  return;
+}
+
 // get xyz dragonfly coords
 void coordinates(MPI_Comm comm, int *coords) {
   int nid=-1;
@@ -77,7 +103,7 @@ void pprintI(char* str, int i, MPI_Comm comm) {
 
 int main(int argc, char** argv) {
   int i;
-  int rank, nprocs;
+  int rank, nprocs, newrank;
 
   //init MPI
   int required=MPI_THREAD_FUNNELED, provided;
@@ -95,6 +121,7 @@ int main(int argc, char** argv) {
 
   //read parameters
   //init parser
+  std::string mode="all-to-all";
   int error=0;
   int n=8, nt=1000, numcols=1;
   double trun = 20.0;
@@ -104,6 +131,14 @@ int main(int argc, char** argv) {
     InputParser input(argc, argv);
 
     //parse box size arguments:
+    if(input.cmdOptionExists("--mode")){
+        //Do stuff
+        mode=input.getCmdOption("--mode");
+        if( (mode!="all-to-all") && (mode!="allreduce") ){
+          std::cerr << "Error, please specify either all-to-all or allreduce." << std::endl;
+          error=1;
+        }
+    }
     if(input.cmdOptionExists("--buffer_size")){
         // Do stuff
         n = atoi(input.getCmdOption("--buffer_size").c_str());
@@ -122,6 +157,11 @@ int main(int argc, char** argv) {
     }
   }
   //broadcast
+  MPI_Bcast(&error,1,MPI_INTEGER,0,MPI_COMM_WORLD);
+  if(error){
+    MPI_Finalize();
+  }
+  MPI_Bcast(&mode.c_str(),mode.size(),MPI_CHAR,0,MPI_COMM_WORLD);
   MPI_Bcast(&n,1,MPI_INTEGER,0,MPI_COMM_WORLD);
   MPI_Bcast(&nt,1,MPI_INTEGER,0,MPI_COMM_WORLD);
   MPI_Bcast(&trun,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
@@ -129,7 +169,10 @@ int main(int argc, char** argv) {
 
   //do coloring;
   srand(rank);
-  int color = static_cast<int>(random_at_mostL(numcols));
+  int color=0;
+  if(numcols>1){
+    color = static_cast<int>(random_at_mostL(numcols-1));
+  }
   MPI_Comm_split(comm, color, rank, &comm_s);
   pprintI("color", color, comm);
 
@@ -139,10 +182,23 @@ int main(int argc, char** argv) {
   double* ts2 = new double[nt];
 
   double delay=1./double(numcols);
-  printf("Sleeping 0 - %f\n", MPI_Wtime());
+  MPI_Comm_rank(comm_s,&newrank);
+  MPI_Barrier(comm_s);
+  if(newrank==0){
+    printf("Sleeping %i - %f\n", color, MPI_Wtime());
+    fflush(stdout);
+  }
   sleep( static_cast<int>(color*delay*trun) );
-  printf("Woke 0 - %f\n", MPI_Wtime());
-  a2a(n, nt, trun, t1, ts1, comm_s);
+  if(newrank==0){
+    printf("Woke %i - %f\n", color, MPI_Wtime());
+    fflush(stdout);
+  }
+  if(mode=="all-to-all"){
+    a2a(n, nt, trun, t1, ts1, comm_s);
+  }
+  else if(mode=="allreduce"){
+    ar(n, nt, trun, t1, ts1, comm_s);
+  }
   MPI_Barrier(comm);
 
   for(unsigned int c=0; c<numcols; c++){

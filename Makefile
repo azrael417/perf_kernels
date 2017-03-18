@@ -1,16 +1,17 @@
 
 CXX:=CC
 OPTFLAGS:=-qopenmp -O3
-DEBUGFLAGS:=-g -dynamic
+DEBUGFLAGS:=-g #-dynamic
 CPPFLAGS:=$(OPTFLAGS) $(DEBUGFLAGS) -mkl -std=c++11
 LDFLAGS:=$(DEBUGFLAGS)
 LIBS:= # $(DDT_LINK_DMALLOC)
 
+#targets
 %.o: %.cpp
 	$(CXX) $(CPPFLAGS) -c $< -o $@
 
-all-to-all.x : utils.o all-to-all.o
-	$(CXX) $(CPPFLAGS) $(LDFLAGS) utils.o all-to-all.o -o all-to-all.x $(LIBS)
+collectives.x : utils.o collectives.o
+	$(CXX) $(CPPFLAGS) $(LDFLAGS) utils.o collectives.o -o collectives.x $(LIBS)
 
 minibench.x : utils.o minibench.o
 	$(CXX) $(CPPFLAGS) $(LDFLAGS) utils.o minibench.o -o minibench.x $(LIBS)
@@ -18,5 +19,8 @@ minibench.x : utils.o minibench.o
 nn_exchange.x : utils.o nn_exchange.o
 	$(CXX) $(CPPFLAGS) $(LDFLAGS) utils.o nn_exchange.o -o nn_exchange.x $(LIBS)
 
+all: all-to-all.x minibench.x nn_exchange.x
+
+.PHONY: clean
 clean :
 	rm -f *.o *.x
