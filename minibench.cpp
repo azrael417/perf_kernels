@@ -15,12 +15,30 @@ int main(int argc, char* argv[]){
   int myrank=0, numranks;
   MPI_Comm_size(MPI_COMM_WORLD,&numranks);
   MPI_Comm_rank(MPI_COMM_WORLD,&myrank);
+  
+  //get arguments:
+  int N=8192, niter=10;
+  if(myrank==0){
+	  InputParser input(argc, argv);
+	  if(input.cmdOptionExists("--rank")){
+	      if(input.cmdOptionExists("--rank")){
+	          // Do stuff
+	          N = atoi(input.getCmdOption("--rank").c_str());
+	      }
+	  }
+	  if(input.cmdOptionExists("--niter")){
+	      if(input.cmdOptionExists("--niter")){
+	          // Do stuff
+	          niter = atoi(input.getCmdOption("--niter").c_str());
+	      }
+	  }
+  }
+  MPI_Bcast(&N,1,MPI_INTEGER,0,MPI_COMM_WORLD);
+  MPI_Bcast(&niter,1,MPI_INTEGER,0,MPI_COMM_WORLD);
 
   if(myrank==0) std::cout << "--- starting DGEMM minibench ---" << std::endl;
 
   //set up matrix:
-  const int N=8192;
-  const int niter=10;
   double *m1 = reinterpret_cast<double*>(aligned_alloc(64, N*N*sizeof(double)));
   double *m2 = reinterpret_cast<double*>(aligned_alloc(64, N*N*sizeof(double)));
   double *m3 = reinterpret_cast<double*>(aligned_alloc(64, N*N*sizeof(double)));
@@ -70,9 +88,12 @@ int main(int argc, char* argv[]){
   //ordered timings printed
   if(myrank==0){
     for(unsigned int rank=0; rank<numranks; rank++){
-        std::cout << "DGEMM time (size: " << N << "x" << N << ", rank: " << rank << "): min = " << tminv[rank]
-                                                                                  << ", max = " << tmaxv[rank]
-                                                                                  << ", mean = " << tavev[rank] << std::endl;
+        std::cout << "DGEMM time (size: " << N << "x" << N << ", niter: " << niter 
+														   << ", rank: " << rank 
+														   << ", hostname: " << get_hostname()
+														   << "): min = " << tminv[rank]
+                                                           << ", max = " << tmaxv[rank]
+                                                           << ", mean = " << tavev[rank] << std::endl;
       }
   }
   MPI_Barrier(MPI_COMM_WORLD);

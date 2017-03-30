@@ -4,6 +4,8 @@
 #include <vector>
 #include <iterator>
 #include <iostream>
+#include <sstream>
+#include <iomanip>
 #include <algorithm>
 #include <unistd.h>
 #include <string>

@@ -31,7 +31,9 @@ std::vector<std::string> split(const std::string&,char);
 
 //output time printing
 void output_timing(char*,double*,double*,int,MPI_Comm);
-#endif
+
+//get physical hostname of node
+std::string get_hostname(const std::string& prefix="nid");
 
 //serial RNG, same Random numbers on every node. DO NOT USE FOR MC AND NEVER ON 32bit SYSTEMS!! This guy is 64bit only!!!
 struct Ran{
@@ -70,3 +72,5 @@ Ran(Ullong j=0) : v(4101842887655102017LL), w(1){
     }
   }
 };
+
+#endif

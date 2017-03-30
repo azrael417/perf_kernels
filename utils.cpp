@@ -36,9 +36,9 @@ void output_timing(char* str, double *t, double *ts, int nt, MPI_Comm comm) {
   double* tmin=new double[nt];
   double* tmax=new double[nt];
   double* tavg=new double[nt];
-  MPI_Reduce(&t[i], &tmin[i], nt, MPI_DOUBLE, MPI_MIN, 0, comm);
-  MPI_Reduce(&t[i], &tmax[i], nt, MPI_DOUBLE, MPI_MAX, 0, comm);
-  MPI_Reduce(&t[i], &tavg[i], nt, MPI_DOUBLE, MPI_SUM, 0, comm);
+  MPI_Reduce(t, tmin, nt, MPI_DOUBLE, MPI_MIN, 0, comm);
+  MPI_Reduce(t, tmax, nt, MPI_DOUBLE, MPI_MAX, 0, comm);
+  MPI_Reduce(t, tavg, nt, MPI_DOUBLE, MPI_SUM, 0, comm);
   for(unsigned int i=0; i<nt; i++) tavg[i] /= nprocs;
 
   if (rank==0) {
@@ -49,4 +49,14 @@ void output_timing(char* str, double *t, double *ts, int nt, MPI_Comm comm) {
   delete [] tmin,tmax,tavg;
   MPI_Barrier(comm);
   return;
+}
+
+std::string get_hostname(const std::string& prefix){
+	int pmirank=-1;
+	int nid=-1;
+	PMI_Get_rank(&pmirank);
+	PMI_Get_nid(pmirank, &nid);
+	std::stringstream stream;
+	stream << prefix << std::setfill('0') << std::setw(5) << nid;
+	return stream.str();
 }
