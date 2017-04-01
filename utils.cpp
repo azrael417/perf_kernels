@@ -51,6 +51,20 @@ void output_timing(char* str, double *t, double *ts, int nt, MPI_Comm comm) {
   return;
 }
 
+int get_hostid(){
+	int pmirank=-1;
+	int nid=-1;
+	PMI_Get_rank(&pmirank);
+	PMI_Get_nid(pmirank, &nid);
+	return nid;
+}
+
+std::string hostid_to_name(const int& hostid, const std::string& prefix){
+	std::stringstream stream;
+	stream << prefix << std::setfill('0') << std::setw(5) << hostid;
+	return stream.str();
+}
+
 std::string get_hostname(const std::string& prefix){
 	int pmirank=-1;
 	int nid=-1;

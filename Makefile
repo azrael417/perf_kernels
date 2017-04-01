@@ -18,7 +18,10 @@ minibench.x : utils.o minibench.o
 nn_exchange.x : utils.o nn_exchange.o
 	$(CXX) $(CPPFLAGS) $(LDFLAGS) utils.o nn_exchange.o -o nn_exchange.x $(LIBS)
 
-all: all-to-all.x minibench.x nn_exchange.x
+stream.x : stream.o
+	$(CXX) $(CPPFLAGS) $(LDFLAGS) stream.o -o stream.x $(LIBS)
+
+all: collectives.x minibench.x nn_exchange.x stream.x
 
 .PHONY: clean
 clean :

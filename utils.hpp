@@ -33,6 +33,8 @@ std::vector<std::string> split(const std::string&,char);
 void output_timing(char*,double*,double*,int,MPI_Comm);
 
 //get physical hostname of node
+int get_hostid();
+std::string hostid_to_name(const int& hostid, const std::string& prefix="nid");
 std::string get_hostname(const std::string& prefix="nid");
 
 //serial RNG, same Random numbers on every node. DO NOT USE FOR MC AND NEVER ON 32bit SYSTEMS!! This guy is 64bit only!!!
