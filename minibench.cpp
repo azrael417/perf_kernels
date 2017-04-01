@@ -181,7 +181,7 @@ int main(int argc, char* argv[]){
 		switch(mode) {
 			case 0:
 				for(unsigned int rank=0; rank<numranks; rank++){
-					std::cout << "STREAM time (size: " << streamsize*16./(1024.*1024.) << "MiB, niter: " << niter;
+					std::cout << "STREAM-TRIAD time (size: " << streamsize*16./(1024.*1024.) << "MiB, niter: " << niter;
 					std::cout << ", rank: " << rank;
 					std::cout << ", hostname: " << hostid_to_name(hostidv[rank]);
 					std::cout << "): min = " << tminv[rank];
@@ -192,7 +192,7 @@ int main(int argc, char* argv[]){
 			case 1:
 				std::cout << "benchmark,niter,rank,hostname,min,max,mean" << std::endl;
 				for(unsigned int rank=0; rank<numranks; rank++){
-					std::cout << "STREAM("<< streamsize*16./(1024.*1024.) <<"MiB),";
+					std::cout << "STREAM-TRIAD("<< streamsize*16./(1024.*1024.) <<"MiB),";
 					std::cout << niter << ",";
 					std::cout << rank << ",";
 					std::cout << hostid_to_name(hostidv[rank]) << ",";
