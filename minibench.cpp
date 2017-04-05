@@ -74,6 +74,9 @@ int main(int argc, char* argv[]){
 
 	//run and time
 	if( (myrank==0) && (mode==0) ) std::cout << "running DGEMM benchmark" << std::endl;
+	//exclude the first test
+	dgemm(&TA,&TB,&N,&N,&N,&alpha,m1,&N,m2,&N,&beta,m3,&N);
+	//now do serious testing
 	ts=MPI_Wtime();
 	dgemm(&TA,&TB,&N,&N,&N,&alpha,m1,&N,m2,&N,&beta,m3,&N);
 	t=MPI_Wtime()-ts;
@@ -114,7 +117,7 @@ int main(int argc, char* argv[]){
 				}
 				break;
 			case 1:
-				std::cout << "benchmark,niter,rank,hostname,min,max,mean" << std::endl;
+				std::cout << "benchmark,niter,rank,hostname,t_min,t_max,t_mean" << std::endl;
 				for(unsigned int rank=0; rank<numranks; rank++){
 					std::cout << "DGEMM("<< N << "x" << N <<"),";
 					std::cout << niter << ",";
@@ -150,6 +153,12 @@ int main(int argc, char* argv[]){
 
 	//run triad
 	if( (myrank==0) && (mode==0) ) std::cout << "running STREAM benchmark" << std::endl;
+	//exclude the first test
+#pragma omp parallel for
+	for (ssize_t j=0; j<streamsize; j++){
+		m1[j] = m2[j]+scalar*m3[j];
+	}
+	//now do serious testing
 	ts=MPI_Wtime();
 #pragma omp parallel for
 	for (ssize_t j=0; j<streamsize; j++){
@@ -190,7 +199,6 @@ int main(int argc, char* argv[]){
 				}
 				break;
 			case 1:
-				std::cout << "benchmark,niter,rank,hostname,min,max,mean" << std::endl;
 				for(unsigned int rank=0; rank<numranks; rank++){
 					std::cout << "STREAM-TRIAD("<< streamsize*16./(1024.*1024.) <<"MiB),";
 					std::cout << niter << ",";
