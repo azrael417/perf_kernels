@@ -53,6 +53,9 @@ int main(int argc, char* argv[]){
 	double *m1 = reinterpret_cast<double*>(aligned_alloc(64, N*N*sizeof(double)));
 	double *m2 = reinterpret_cast<double*>(aligned_alloc(64, N*N*sizeof(double)));
 	double *m3 = reinterpret_cast<double*>(aligned_alloc(64, N*N*sizeof(double)));
+	
+	//gflop for this operation:
+	double gflop=2.0*N*N*(N+1)*1E-9;
 
 	//set up seed for seeded random numbers:
 	if( (myrank==0) && (mode==0) ) std::cout << "preparing DGEMM matrix" << std::endl;
@@ -69,7 +72,7 @@ int main(int argc, char* argv[]){
 
 	//set up BLAS stuff
 	char TA='N', TB='N';
-	double ts,t,tmin,tmax,tave;
+	double ts,t,tmin,tmax,tave, pmin, pmax, pave;
 	double alpha=1., beta=0.;
 
 	//run and time
@@ -81,26 +84,38 @@ int main(int argc, char* argv[]){
 	dgemm(&TA,&TB,&N,&N,&N,&alpha,m1,&N,m2,&N,&beta,m3,&N);
 	t=MPI_Wtime()-ts;
 	tmin=t; tmax=t; tave=t;
+	pave=gflop/t;
 	for(unsigned int i=1; i<niter; i++){
 		ts=MPI_Wtime();
 		dgemm(&TA,&TB,&N,&N,&N,&alpha,m1,&N,m2,&N,&beta,m3,&N);
 		t=MPI_Wtime()-ts;
+		
+		//time
 		tmin=(t<tmin ? t : tmin);
 		tmax=(t>tmax ? t : tmax);
 		tave+=t;
+		
+		//performance
+		pave+=gflop/t;
 	}
 	tave/=double(niter);
+	pave/=double(niter);
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	//gather data from the nodes:
+	//timing
 	double* tminv=new double[numranks];
 	double* tmaxv=new double[numranks];
 	double* tavev=new double[numranks];
+	//performance
+	double* pavev=new double[numranks];
+	//some other stuff
 	int* hostidv=new int[numranks];
 	int hostid=get_hostid();
 	MPI_Gather(&tmin,1,MPI_DOUBLE,tminv,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Gather(&tmax,1,MPI_DOUBLE,tmaxv,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Gather(&tave,1,MPI_DOUBLE,tavev,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	MPI_Gather(&pave,1,MPI_DOUBLE,pavev,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Gather(&hostid,1,MPI_INTEGER,hostidv,1,MPI_INTEGER,0,MPI_COMM_WORLD);
 
 	//ordered timings printed
@@ -111,21 +126,29 @@ int main(int argc, char* argv[]){
 					std::cout << "DGEMM time (size: " << N << "x" << N << ", niter: " << niter;
 					std::cout << ", rank: " << rank;
 					std::cout << ", hostname: " << hostid_to_name(hostidv[rank]);
-					std::cout << "): min = " << tminv[rank];
-					std::cout << ", max = " << tmaxv[rank];
-					std::cout << ", mean = " << tavev[rank] << std::endl;
+					std::cout << "): t_min = " << tminv[rank];
+					std::cout << ", t_max = " << tmaxv[rank];
+					std::cout << ", t_mean = " << tavev[rank] << std::endl;
+					std::cout << ", p_min = " << gflop/tmaxv[rank];
+					std::cout << ", p_max = " << gflop/tminv[rank];
+					std::cout << ", p_mean = " << pavev[rank] << std::endl;
 				}
 				break;
 			case 1:
-				std::cout << "benchmark,niter,rank,hostname,t_min,t_max,t_mean" << std::endl;
+				std::cout << "benchmark,niter,rank,hostname,t_min,t_max,t_mean,p_min,p_max,p_mean" << std::endl;
 				for(unsigned int rank=0; rank<numranks; rank++){
 					std::cout << "DGEMM("<< N << "x" << N <<"),";
 					std::cout << niter << ",";
 					std::cout << rank << ",";
 					std::cout << hostid_to_name(hostidv[rank]) << ",";
+					//timings
 					std::cout << tminv[rank] << ",";
 					std::cout << tmaxv[rank] << ",";
 					std::cout << tavev[rank] << ",";
+					//performance
+					std::cout << gflop/tmaxv[rank] << ",";
+					std::cout << gflop/tminv[rank] << ",";
+					std::cout << pavev[rank];
 					std::cout << std::endl;
 				}
 				break;
@@ -148,6 +171,9 @@ int main(int argc, char* argv[]){
 	m2=new double[streamsize];
 	m3=new double[streamsize];
 
+	//double: GB transferred for this operation
+	double gb=streamsize*16./(1024.*1024.*1024.);
+
 	//constant
 	const double scalar=3.0;
 
@@ -166,6 +192,7 @@ int main(int argc, char* argv[]){
 	}
 	t=MPI_Wtime()-ts;
 	tmin=t; tmax=t; tave=t;
+	pave=gb/t;
 	for(unsigned int i=1; i<niter; i++){
 		ts=MPI_Wtime();
 #pragma omp parallel for
@@ -173,17 +200,24 @@ int main(int argc, char* argv[]){
 	    	m1[j] = m2[j]+scalar*m3[j];
 		}
 		t=MPI_Wtime()-ts;
+		
+		//time
 		tmin=(t<tmin ? t : tmin);
 		tmax=(t>tmax ? t : tmax);
 		tave+=t;
+		
+		//bandwidth
+		pave+=gb/t;
 	}
 	tave/=double(niter);
+	pave/=double(niter);
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	//gather results
 	MPI_Gather(&tmin,1,MPI_DOUBLE,tminv,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Gather(&tmax,1,MPI_DOUBLE,tmaxv,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Gather(&tave,1,MPI_DOUBLE,tavev,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	MPI_Gather(&pave,1,MPI_DOUBLE,pavev,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 
 	//ordered timings printed
 	if(myrank==0){
@@ -193,9 +227,13 @@ int main(int argc, char* argv[]){
 					std::cout << "STREAM-TRIAD time (size: " << streamsize*16./(1024.*1024.) << "MiB, niter: " << niter;
 					std::cout << ", rank: " << rank;
 					std::cout << ", hostname: " << hostid_to_name(hostidv[rank]);
-					std::cout << "): min = " << tminv[rank];
-					std::cout << ", max = " << tmaxv[rank];
-					std::cout << ", mean = " << tavev[rank] << std::endl;
+					std::cout << "): t_min = " << tminv[rank];
+					std::cout << ", t_max = " << tmaxv[rank];
+					std::cout << ", t_mean = " << tavev[rank];
+					std::cout << ", p_min = " << gb/tmaxv[rank];
+					std::cout << ", p_max = " << gb/tminv[rank];
+					std::cout << ", p_mean = " << pavev[rank];
+					std::cout << std::endl;
 				}
 				break;
 			case 1:
@@ -204,9 +242,14 @@ int main(int argc, char* argv[]){
 					std::cout << niter << ",";
 					std::cout << rank << ",";
 					std::cout << hostid_to_name(hostidv[rank]) << ",";
+					//time
 					std::cout << tminv[rank] << ",";
 					std::cout << tmaxv[rank] << ",";
 					std::cout << tavev[rank] << ",";
+					//bandwidth
+					std::cout << gb/tmaxv[rank] << ",";
+					std::cout << gb/tminv[rank] << ",";
+					std::cout << pavev[rank];
 					std::cout << std::endl;
 				}
 				break;
