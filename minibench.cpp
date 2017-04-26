@@ -163,7 +163,7 @@ int main(int argc, char* argv[]){
 							//timings
 							std::cout << tvalsv[i+rank*niter] << ",";
 							//performance
-							std::cout << gflop/tvalsv[i+rank*niter] << ",";
+							std::cout << gflop/tvalsv[i+rank*niter];
 							std::cout << std::endl;
 						}
 					}
@@ -282,7 +282,7 @@ int main(int argc, char* argv[]){
 							//time
 							std::cout << tvalsv[i+niter*rank] << ",";
 							//bandwidth
-							std::cout << gb/tvalsv[i+niter*rank] << ",";
+							std::cout << gb/tvalsv[i+niter*rank];
 							std::cout << std::endl;
 						}
 					}
