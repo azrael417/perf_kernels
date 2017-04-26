@@ -42,6 +42,11 @@ int main(int argc, char* argv[]){
 		}
 		if(input.cmdOptionExists("--csv")) mode=1;
 		if(input.cmdOptionExists("--detailed")) detailed=1;
+		
+		if( (detailed==1) && (mode==0) ){
+			std::cout << "Warning, detailed printouts only available in csv mode, please specify --csv. Defaulting to normal printout." << std::endl;
+			detailed=0;
+		}
 	}
 	MPI_Bcast(&N,1,MPI_INTEGER,0,MPI_COMM_WORLD);
 	MPI_Bcast(&niter,1,MPI_INTEGER,0,MPI_COMM_WORLD);
