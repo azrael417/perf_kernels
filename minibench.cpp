@@ -63,7 +63,7 @@ int main(int argc, char* argv[]){
 	double *m3 = reinterpret_cast<double*>(aligned_alloc(64, N*N*sizeof(double)));
 	
 	//gflop for this operation:
-	double alpha=1., beta=0.;
+	double alpha=1., beta=1.;
 	double gflop=2.0*N*N*1E-9*(fabs(beta)<0.00001 ? N : (N+1));
 
 	//set up seed for seeded random numbers:
@@ -94,8 +94,9 @@ int main(int argc, char* argv[]){
 	dgemm(&TA,&TB,&N,&N,&N,&alpha,m1,&N,m2,&N,&beta,m3,&N);
 	t=MPI_Wtime()-ts;
 	tmin=t; tmax=t; tave=t;
+	if(detailed) tvals[0]=t;
 	pave=gflop/t;
-	for(unsigned int i=1; i<=niter; i++){
+	for(unsigned int i=1; i<niter; i++){
 		ts=MPI_Wtime();
 		dgemm(&TA,&TB,&N,&N,&N,&alpha,m1,&N,m2,&N,&beta,m3,&N);
 		t=MPI_Wtime()-ts;
@@ -109,7 +110,7 @@ int main(int argc, char* argv[]){
 		pave+=gflop/t;
 		
 		//if detailed, store t:
-		if(detailed) tvals[i-1]=t;
+		if(detailed) tvals[i]=t;
 	}
 	tave/=double(niter);
 	pave/=double(niter);
@@ -227,8 +228,9 @@ int main(int argc, char* argv[]){
 	}
 	t=MPI_Wtime()-ts;
 	tmin=t; tmax=t; tave=t;
+	if(detailed) tvals[0]=t;
 	pave=gb/t;
-	for(unsigned int i=1; i<=niter; i++){
+	for(unsigned int i=1; i<niter; i++){
 		ts=MPI_Wtime();
 #pragma omp parallel for
 		for (ssize_t j=0; j<streamsize; j++){
@@ -243,6 +245,9 @@ int main(int argc, char* argv[]){
 		
 		//bandwidth
 		pave+=gb/t;
+		
+		//if detailed, store t:
+		if(detailed) tvals[i]=t;
 	}
 	tave/=double(niter);
 	pave/=double(niter);
