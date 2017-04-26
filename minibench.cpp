@@ -228,7 +228,7 @@ int main(int argc, char* argv[]){
 	t=MPI_Wtime()-ts;
 	tmin=t; tmax=t; tave=t;
 	pave=gb/t;
-	for(unsigned int i=1; i<niter; i++){
+	for(unsigned int i=1; i<=niter; i++){
 		ts=MPI_Wtime();
 #pragma omp parallel for
 		for (ssize_t j=0; j<streamsize; j++){

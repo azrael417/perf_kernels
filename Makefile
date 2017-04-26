@@ -1,7 +1,7 @@
 CXX:=CC
 OPTFLAGS:=-qopenmp -O3
 DEBUGFLAGS:=-g #-dynamic
-CPPFLAGS:=$(OPTFLAGS) $(DEBUGFLAGS) -mkl -std=c++11
+CPPFLAGS:=$(OPTFLAGS) $(DEBUGFLAGS) -mkl -std=c++11 -xMIC-AVX512 -fp-model fast=2
 LDFLAGS:=$(DEBUGFLAGS) -Wl,--whole-archive,-ldmapp,--no-whole-archive
 LIBS:= # $(DDT_LINK_DMALLOC)
 
