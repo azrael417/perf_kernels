@@ -63,7 +63,8 @@ int main(int argc, char* argv[]){
 	double *m3 = reinterpret_cast<double*>(aligned_alloc(64, N*N*sizeof(double)));
 	
 	//gflop for this operation:
-	double gflop=2.0*N*N*(N+1)*1E-9;
+	double alpha=1., beta=0.;
+	double gflop=2.0*N*N*1E-9*(fabs(beta)<0.00001 ? N : (N+1));
 
 	//set up seed for seeded random numbers:
 	if( (myrank==0) && (mode==0) ) std::cout << "preparing DGEMM matrix" << std::endl;
@@ -81,7 +82,6 @@ int main(int argc, char* argv[]){
 	//set up BLAS stuff
 	char TA='N', TB='N';
 	double ts,t,tmin,tmax,tave, pmin, pmax, pave;
-	double alpha=1., beta=0.;
 	double* tvals;
 	if(detailed) tvals=new double[niter];
 
