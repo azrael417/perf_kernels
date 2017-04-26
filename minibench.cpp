@@ -18,7 +18,7 @@ int main(int argc, char* argv[]){
   
 	//get arguments:
 	int N=8192, niter=10;
-	int mode=0;
+	int mode=0, detailed=0;
 	ssize_t streamsize=10000000;
 	if(myrank==0){
 		InputParser input(argc, argv);
@@ -41,12 +41,15 @@ int main(int argc, char* argv[]){
 			}
 		}
 		if(input.cmdOptionExists("--csv")) mode=1;
+		if(input.cmdOptionExists("--detailed")) detailed=1;
 	}
 	MPI_Bcast(&N,1,MPI_INTEGER,0,MPI_COMM_WORLD);
 	MPI_Bcast(&niter,1,MPI_INTEGER,0,MPI_COMM_WORLD);
 	MPI_Bcast(&streamsize,1,MPI_LONG,0,MPI_COMM_WORLD);
 	MPI_Bcast(&mode,1,MPI_INTEGER,0,MPI_COMM_WORLD);
-
+	MPI_Bcast(&detailed,1,MPI_INTEGER,0,MPI_COMM_WORLD);
+	
+	//print what is going on
 	if( (myrank==0) && (mode==0) ) std::cout << "--- starting DGEMM minibench ---" << std::endl;
 
 	//set up matrix:
@@ -74,6 +77,8 @@ int main(int argc, char* argv[]){
 	char TA='N', TB='N';
 	double ts,t,tmin,tmax,tave, pmin, pmax, pave;
 	double alpha=1., beta=0.;
+	double* tvals;
+	if(detailed) tvals=new double[niter];
 
 	//run and time
 	if( (myrank==0) && (mode==0) ) std::cout << "running DGEMM benchmark" << std::endl;
@@ -85,7 +90,7 @@ int main(int argc, char* argv[]){
 	t=MPI_Wtime()-ts;
 	tmin=t; tmax=t; tave=t;
 	pave=gflop/t;
-	for(unsigned int i=1; i<niter; i++){
+	for(unsigned int i=1; i<=niter; i++){
 		ts=MPI_Wtime();
 		dgemm(&TA,&TB,&N,&N,&N,&alpha,m1,&N,m2,&N,&beta,m3,&N);
 		t=MPI_Wtime()-ts;
@@ -97,6 +102,9 @@ int main(int argc, char* argv[]){
 		
 		//performance
 		pave+=gflop/t;
+		
+		//if detailed, store t:
+		if(detailed) tvals[i-1]=t;
 	}
 	tave/=double(niter);
 	pave/=double(niter);
@@ -109,6 +117,9 @@ int main(int argc, char* argv[]){
 	double* tavev=new double[numranks];
 	//performance
 	double* pavev=new double[numranks];
+	//full time results:
+	double* tvalsv;
+	if(detailed) tvalsv=new double[niter*numranks];
 	//some other stuff
 	int* hostidv=new int[numranks];
 	int hostid=get_hostid();
@@ -117,6 +128,7 @@ int main(int argc, char* argv[]){
 	MPI_Gather(&tave,1,MPI_DOUBLE,tavev,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Gather(&pave,1,MPI_DOUBLE,pavev,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	MPI_Gather(&hostid,1,MPI_INTEGER,hostidv,1,MPI_INTEGER,0,MPI_COMM_WORLD);
+	if(detailed) MPI_Gather(tvals,niter,MPI_DOUBLE,tvalsv,niter,MPI_DOUBLE,0,MPI_COMM_WORLD);
 
 	//ordered timings printed
 	if(myrank==0){
@@ -135,21 +147,39 @@ int main(int argc, char* argv[]){
 				}
 				break;
 			case 1:
-				std::cout << "benchmark,niter,rank,hostname,t_min,t_max,t_mean,p_min,p_max,p_mean" << std::endl;
-				for(unsigned int rank=0; rank<numranks; rank++){
-					std::cout << "DGEMM("<< N << "x" << N <<"),";
-					std::cout << niter << ",";
-					std::cout << rank << ",";
-					std::cout << hostid_to_name(hostidv[rank]) << ",";
-					//timings
-					std::cout << tminv[rank] << ",";
-					std::cout << tmaxv[rank] << ",";
-					std::cout << tavev[rank] << ",";
-					//performance
-					std::cout << gflop/tmaxv[rank] << ",";
-					std::cout << gflop/tminv[rank] << ",";
-					std::cout << pavev[rank];
-					std::cout << std::endl;
+				if(detailed){
+					std::cout << "benchmark,rank,hostname,iter,t,p" << std::endl;
+					for(unsigned int rank=0; rank<numranks; rank++){
+						for(unsigned int i=0; i<niter; i++){
+							std::cout << "DGEMM("<< N << "x" << N <<"),";
+							std::cout << rank << ",";
+							std::cout << hostid_to_name(hostidv[rank]) << ",";
+							std::cout << i << ",";
+							//timings
+							std::cout << tvalsv[i+rank*niter] << ",";
+							//performance
+							std::cout << gflop/tvalsv[i+rank*niter] << ",";
+							std::cout << std::endl;
+						}
+					}
+				}
+				else{
+					std::cout << "benchmark,niter,rank,hostname,t_min,t_max,t_mean,p_min,p_max,p_mean" << std::endl;
+					for(unsigned int rank=0; rank<numranks; rank++){
+						std::cout << "DGEMM("<< N << "x" << N <<"),";
+						std::cout << niter << ",";
+						std::cout << rank << ",";
+						std::cout << hostid_to_name(hostidv[rank]) << ",";
+						//timings
+						std::cout << tminv[rank] << ",";
+						std::cout << tmaxv[rank] << ",";
+						std::cout << tavev[rank] << ",";
+						//performance
+						std::cout << gflop/tmaxv[rank] << ",";
+						std::cout << gflop/tminv[rank] << ",";
+						std::cout << pavev[rank];
+						std::cout << std::endl;
+					}
 				}
 				break;
 			}
@@ -237,20 +267,37 @@ int main(int argc, char* argv[]){
 				}
 				break;
 			case 1:
-				for(unsigned int rank=0; rank<numranks; rank++){
-					std::cout << "STREAM-TRIAD("<< streamsize*16./(1024.*1024.) <<"MiB),";
-					std::cout << niter << ",";
-					std::cout << rank << ",";
-					std::cout << hostid_to_name(hostidv[rank]) << ",";
-					//time
-					std::cout << tminv[rank] << ",";
-					std::cout << tmaxv[rank] << ",";
-					std::cout << tavev[rank] << ",";
-					//bandwidth
-					std::cout << gb/tmaxv[rank] << ",";
-					std::cout << gb/tminv[rank] << ",";
-					std::cout << pavev[rank];
-					std::cout << std::endl;
+				if(detailed){
+					for(unsigned int rank=0; rank<numranks; rank++){
+						for(unsigned int i=0; i<niter; i++){
+							std::cout << "STREAM-TRIAD("<< streamsize*16./(1024.*1024.) <<"MiB),";
+							std::cout << rank << ",";
+							std::cout << hostid_to_name(hostidv[rank]) << ",";
+							std::cout << i << ",";
+							//time
+							std::cout << tvalsv[i+niter*rank] << ",";
+							//bandwidth
+							std::cout << gb/tvalsv[i+niter*rank] << ",";
+							std::cout << std::endl;
+						}
+					}
+				}
+				else{
+					for(unsigned int rank=0; rank<numranks; rank++){
+						std::cout << "STREAM-TRIAD("<< streamsize*16./(1024.*1024.) <<"MiB),";
+						std::cout << niter << ",";
+						std::cout << rank << ",";
+						std::cout << hostid_to_name(hostidv[rank]) << ",";
+						//time
+						std::cout << tminv[rank] << ",";
+						std::cout << tmaxv[rank] << ",";
+						std::cout << tavev[rank] << ",";
+						//bandwidth
+						std::cout << gb/tmaxv[rank] << ",";
+						std::cout << gb/tminv[rank] << ",";
+						std::cout << pavev[rank];
+						std::cout << std::endl;
+					}
 				}
 				break;
 			}
@@ -262,6 +309,10 @@ int main(int argc, char* argv[]){
 
 	//cleaning up
 	delete [] tminv, tmaxv, tavev, hostidv;
+	if(detailed){
+		delete [] tvalsv;
+		delete [] tvals;
+	}
 
 	MPI_Finalize();
 }
