@@ -1,0 +1,115 @@
+#!/usr/common/software/python/2.7-anaconda-4.4/bin/python
+
+import argparse
+import subprocess as sp
+import stat
+import os
+import numpy as np
+import re
+import pandas as pd
+from StringIO import StringIO
+
+#add arguments
+parser = argparse.ArgumentParser(description='srun wrapper with performance profiling functionality')
+parser.add_argument('--profile', metavar='p', type=str, nargs='+', help='specify likwid group counters')
+parser.add_argument('--raw', action='store_const', const=True, default=False, help='store the raw counters instead of aggregate metrics')
+
+#parse
+args, other_args = parser.parse_known_args()
+
+#which counters do we want?
+modestring = "Raw" if args.raw else "Metric"
+
+#we need to split the function call from the slurm arguments: assume that there is a -- separator for now:
+seppos = other_args.index("--")
+srun_args = other_args[:seppos]
+exe_args = other_args[seppos+1:]
+
+#parse the profiling args
+argsdict = vars(args);
+mastercmd = ["srun"]+srun_args
+cmdlist = []
+outfiles = []
+
+#do the switch for profiling-no-profiling
+if argsdict['profile']:
+    
+    #split at "," if necessary:
+    counterlist = argsdict["profile"]
+    counterlist = [l for x in counterlist for l in x.split(",")]
+    
+    for item in counterlist:
+        outfiles.append('.likwid.'+item+'.${SLURM_PROCID}.csv')
+        cmd = ['likwid-perfctr','-g',item,'-O','-o',outfiles[-1]]
+        cmd += exe_args
+        cmdlist.append(cmd)
+else:
+    cmd = exe_args
+    cmdlist = [cmd]
+
+#get user environment
+envdict = dict(os.environ)
+
+#iterate over commands and launch them
+for idx, cmd in enumerate(cmdlist):
+    stdout = None
+    stderr = None
+    
+    #create a temporary wrapper script
+    hashval = np.random.randint(0,2**(31))
+    tmpfilename = './.wraprun'+str(hashval)
+    f=open(tmpfilename, 'w+')
+    f.write("#!/bin/bash\n"+" ".join(cmd)+'\n')
+    f.close()
+    st = os.stat(tmpfilename)
+    os.chmod(tmpfilename, st.st_mode | stat.S_IEXEC)
+    
+    try:
+        proc = sp.Popen(mastercmd+[tmpfilename], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE, env=envdict)
+        stdout, stderr = proc.communicate()
+        os.remove(tmpfilename)
+        if stderr:
+            print(stdout)
+            print(stderr)
+        else:
+            print(stdout)
+    except:
+        print("Error executing ",' '.join(mastercmd+cmd))
+        os.remove(tmpfilename)
+        raise
+        
+    #clean up in case of profiling
+    if outfiles:
+        #dataframelist
+        dflist = []
+        #grep all the outputfiles following the certain pattern
+        outfile = outfiles[idx].split("${SLURM_PROCID}")[0]
+        tmpoutfiles =[x for x in os.listdir("./") if x.startswith(outfile)]
+        for tmpoutfile in tmpoutfiles:
+            #get info from filename
+            search = re.findall('^\.likwid\.(.*?)\.(\d{1,}?)\.csv',tmpoutfile)[0]
+            mode = search[0]
+            node = int(search[1])
+            
+            #open and grep right table from csv file:
+            with open(tmpoutfile,"r") as f:
+                body = f.read()
+            search = re.findall(r"(?ms)TABLE,Group \d{1,} "+modestring+"(.+?)TABLE",body)[0]
+            search = '\n'.join(search.split('\n')[1:])
+            
+            #read the prepared piece of the file
+            tmpdf = pd.read_csv(StringIO(search))
+            tmpdf['Node'] = node
+            dflist.append(tmpdf)
+            
+            #remove the file
+            os.remove(tmpoutfile)
+        
+        #do some sorting etc:
+        df = pd.concat(dflist)
+        df.sort_values(by=[df.columns[0],"Node"],inplace=True)
+        df.reset_index(drop=True,inplace=True)
+
+        #store as csv
+        df.to_csv("likwid."+mode+".csv",index=False)
+
