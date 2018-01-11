@@ -11,6 +11,7 @@
 #include <string>
 #include <sstream>
 #include <queue>
+#include <cmath>
 
 //parallelization stuff
 #include <mpi.h>

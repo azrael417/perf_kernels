@@ -1,9 +1,12 @@
 CXX:=CC
-OPTFLAGS:=-qopenmp -O3
+#CXX:=pgc++
+OPTFLAGS:=-qopenmp -O3 -dynamic -std=c++11 -xMIC-AVX512 -fp-model fast=2
+#OPTFLAGS:=-fopenmp -O3
+#OPTFLAG:=-O3
 DEBUGFLAGS:=-g #-dynamic
-CPPFLAGS:=$(OPTFLAGS) $(DEBUGFLAGS) -mkl -std=c++11 -xMIC-AVX512 -fp-model fast=2
-LDFLAGS:=$(DEBUGFLAGS) -Wl,--whole-archive,-ldmapp,--no-whole-archive
-LIBS:= # $(DDT_LINK_DMALLOC)
+CPPFLAGS:=$(OPTFLAGS) $(DEBUGFLAGS) -mkl
+LDFLAGS:=$(DEBUGFLAGS) $(CRAY_PMI_POST_LINK_OPTS) #-L/project/projectdirs/mpccc/tkurth/NESAP/intelcaffe_internal/intelcaffe_src/external/mkl/mklml_lnx_2017.0.2.20170110/lib -lmklml_intel
+LIBS:= -lpmi # $(DDT_LINK_DMALLOC)
 
 #targets
 %.o: %.cpp
@@ -11,6 +14,9 @@ LIBS:= # $(DDT_LINK_DMALLOC)
 
 collectives.x : utils.o collectives.o
 	$(CXX) $(CPPFLAGS) $(LDFLAGS) utils.o collectives.o -o collectives.x $(LIBS)
+
+memmap.x : utils.o memmap.o
+	$(CXX) $(CPPFLAGS) $(LDFLAGS) utils.o memmap.o -o memmap.x $(LIBS) -lrt
 
 minibench.x : utils.o minibench.o
 	$(CXX) $(CPPFLAGS) $(LDFLAGS) utils.o minibench.o -o minibench.x $(LIBS)
